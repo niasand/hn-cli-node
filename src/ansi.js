@@ -28,8 +28,15 @@ export function faint(text) {
   return `\x1b[2m${text}\x1b[0m`;
 }
 
+export function hyperlink(url, label) {
+  if (!url) return label;
+  return `\x1b]8;;${url}\x07${label}\x1b]8;;\x07`;
+}
+
 export function stripAnsi(value) {
-  return String(value).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
+  return String(value)
+    .replace(/\x1b\]8;;.*?(?:\x07|\x1b\\)/g, "")
+    .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
 }
 
 export function visibleWidth(value) {

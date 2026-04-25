@@ -1,5 +1,5 @@
 import readline from "node:readline";
-import { bg, clearScreen, htmlToText, moveHome, padRight, showCursor, truncate, visibleWidth, wrap } from "./ansi.js";
+import { bg, clearScreen, htmlToText, hyperlink, moveHome, padRight, showCursor, truncate, visibleWidth, wrap } from "./ansi.js";
 import { openUrl } from "./browser.js";
 import { categories, categoryLabels, HNClient, relativeTime, storyDomain } from "./hn.js";
 import { paint } from "./theme.js";
@@ -203,7 +203,7 @@ export class App {
     else if (name === "right") return this.switchCategory(1);
     else if (name === "left") return this.switchCategory(-1);
     else if (name === "return") return this.openComments();
-    else if (seq === "o") openUrl(this.currentStory()?.url || `https://news.ycombinator.com/item?id=${this.currentStory()?.id}`);
+    else if (seq === "o") openUrl(this.storyUrl(this.currentStory()));
     else if (seq === "r") return this.refresh();
     else if (seq === "t") return this.translateCurrent(false);
     else if (seq === "T") return this.translateCurrent(true);
@@ -222,7 +222,7 @@ export class App {
     else if (name === "up" || seq === "k") this.commentCursor = Math.max(0, this.commentCursor - 1);
     else if (seq === "g") this.commentCursor = 0;
     else if (seq === "r" || seq === "R") return this.refresh();
-    else if (seq === "o") openUrl(this.detail?.url || `https://news.ycombinator.com/item?id=${this.detail?.id}`);
+    else if (seq === "o") openUrl(this.storyUrl(this.detail));
     else if (seq === "t") return this.translateCurrent(false);
     else if (seq === "C") {
       this.flatComments.forEach((node) => this.collapsed.add(node.item.id));
@@ -257,6 +257,15 @@ export class App {
   storyTitle(story) {
     if (!story) return "(untitled)";
     return this.translations.get(story.id) || story.title || "(untitled)";
+  }
+
+  storyUrl(story) {
+    if (!story) return "";
+    return story.url || `https://news.ycombinator.com/item?id=${story.id}`;
+  }
+
+  storyLink(story) {
+    return hyperlink(this.storyUrl(story), "link");
   }
 
   prefetchCommentThreads() {
@@ -304,7 +313,7 @@ export class App {
     const out = [this.renderHeader(width), this.theme.muted("Enter comments  o open  t/T translate  ←/→ tabs  r refresh  ? help  q quit")];
     for (let i = this.offset; i < Math.min(stories.length, this.offset + rows); i++) {
       const story = stories[i];
-      const meta = `${story.score || 0} pts · ${story.by || "?"} · ${relativeTime(story.time)} · ${story.descendants || 0} comments${story.domain ? ` · ${story.domain}` : ""}`;
+      const meta = `${story.score || 0} pts · ${story.by || "?"} · ${relativeTime(story.time)} · ${story.descendants || 0} comments · ${this.storyLink(story)}${story.domain ? ` · ${story.domain}` : ""}`;
       const marker = i === this.selected ? this.theme.accent("▎") : " ";
       const title = this.storyTitle(story);
       const line = `${marker} ${String(story.rank).padStart(3)}. ${truncate(title, width - 8)}`;
@@ -319,7 +328,7 @@ export class App {
   renderDetail() {
     const { width, height } = this.terminalSize();
     const title = this.storyTitle(this.detail);
-    const meta = `${this.detail?.score || 0} pts · ${this.detail?.by || "?"} · ${this.detail ? relativeTime(this.detail.time) : ""} · Esc back`;
+    const meta = `${this.detail?.score || 0} pts · ${this.detail?.by || "?"} · ${this.detail ? relativeTime(this.detail.time) : ""} · ${this.storyLink(this.detail)} · Esc back`;
     const header = [
       this.renderHeader(width),
       this.theme.title(truncate(title, width)),

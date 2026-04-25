@@ -254,6 +254,11 @@ export class App {
     return (this.stories[this.category] || []).slice(this.offset, this.offset + this.visibleStoryCount());
   }
 
+  storyTitle(story) {
+    if (!story) return "(untitled)";
+    return this.translations.get(story.id) || story.title || "(untitled)";
+  }
+
   prefetchCommentThreads() {
     if (this.mode !== "list") return;
     const stories = this.stories[this.category] || [];
@@ -301,19 +306,19 @@ export class App {
       const story = stories[i];
       const meta = `${story.score || 0} pts · ${story.by || "?"} · ${relativeTime(story.time)} · ${story.descendants || 0} comments${story.domain ? ` · ${story.domain}` : ""}`;
       const marker = i === this.selected ? this.theme.accent("▎") : " ";
-      const title = this.translations.get(story.id) || story.title || "(untitled)";
+      const title = this.storyTitle(story);
       const line = `${marker} ${String(story.rank).padStart(3)}. ${truncate(title, width - 8)}`;
       out.push(i === this.selected ? bg(this.theme.surface, padRight(line, width)) : padRight(line, width));
       out.push(`     ${this.theme.muted(truncate(meta, width - 5))}`);
     }
     while (out.length < height - 1) out.push("");
     out.push(this.footer(width));
-    return out.join("\n");
+    return out.map((line) => padRight(line, width)).join("\n");
   }
 
   renderDetail() {
     const { width, height } = this.terminalSize();
-    const title = this.detail?.title || "(untitled)";
+    const title = this.storyTitle(this.detail);
     const meta = `${this.detail?.score || 0} pts · ${this.detail?.by || "?"} · ${this.detail ? relativeTime(this.detail.time) : ""} · Esc back`;
     const header = [
       this.renderHeader(width),
@@ -345,7 +350,7 @@ export class App {
     const out = header.concat(lines.slice(this.commentOffset, this.commentOffset + bodyRows).map((line) => padRight(line.text, width)));
     while (out.length < height - 1) out.push("");
     out.push(this.footer(width));
-    return out.join("\n");
+    return out.map((line) => padRight(line, width)).join("\n");
   }
 
   footer(width) {

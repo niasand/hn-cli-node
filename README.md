@@ -67,4 +67,15 @@ HN_TRANSLATE_LANG=ZH
 
 For DeepL API Free, use `https://api-free.deepl.com/v2`.
 
+For Youdao text translation, use the application ID as `HN_TRANSLATE_API_KEY`
+and the application secret as `HN_TRANSLATE_API_SECRET`:
+
+```bash
+HN_TRANSLATE_PROVIDER=youdao
+HN_TRANSLATE_API_URL=https://openapi.youdao.com/api
+HN_TRANSLATE_API_KEY=your-youdao-app-id
+HN_TRANSLATE_API_SECRET=your-youdao-app-secret
+HN_TRANSLATE_LANG=zh-CHS
+```
+
 Available themes: `hn`, `mocha`, `dracula`, `tokyo`, `nord`, `gruvbox`.

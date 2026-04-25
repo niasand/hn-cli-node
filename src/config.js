@@ -38,11 +38,17 @@ export function loadTranslateConfig() {
   const config = loadConfig();
   const translate = { ...(config.translate || {}) };
   const provider = process.env.HN_TRANSLATE_PROVIDER || translate.provider || "openai";
-  const defaultApiUrl = provider.toLowerCase() === "deepl" ? "https://api.deepl.com/v2" : "https://api.openai.com/v1";
+  const defaultApiUrls = {
+    deepl: "https://api.deepl.com/v2",
+    openai: "https://api.openai.com/v1",
+    youdao: "https://openapi.youdao.com/api",
+  };
+  const defaultApiUrl = defaultApiUrls[provider.toLowerCase()] || defaultApiUrls.openai;
   return {
     provider,
     apiUrl: process.env.HN_TRANSLATE_API_URL || translate.api_url || defaultApiUrl,
     apiKey: process.env.HN_TRANSLATE_API_KEY || translate.api_key || "",
+    apiSecret: process.env.HN_TRANSLATE_API_SECRET || translate.api_secret || "",
     model: process.env.HN_TRANSLATE_MODEL || translate.model || "gpt-4o-mini",
     language: process.env.HN_TRANSLATE_LANG || translate.language || "Chinese",
   };

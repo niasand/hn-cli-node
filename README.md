@@ -54,6 +54,8 @@ HN_TRANSLATE_MODEL=gpt-4o-mini
 HN_TRANSLATE_LANG=Chinese
 HN_THEME=hn
 HN_MAX_CONCURRENT=64
+HN_CACHE_PATH=~/.cache/hn/cache.sqlite
+HN_CACHE=1
 ```
 
 For DeepL API Pro, use:
@@ -77,5 +79,9 @@ HN_TRANSLATE_API_KEY=your-youdao-app-id
 HN_TRANSLATE_API_SECRET=your-youdao-app-secret
 HN_TRANSLATE_LANG=zh-CHS
 ```
+
+Fetched stories and comments are cached in SQLite at `~/.cache/hn/cache.sqlite`
+by default. Set `HN_CACHE=0` to disable the persistent cache, or set
+`HN_CACHE_PATH` to use a different database file.
 
 Available themes: `hn`, `mocha`, `dracula`, `tokyo`, `nord`, `gruvbox`.

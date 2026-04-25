@@ -1,3 +1,5 @@
+import { SQLiteCache } from "./cache.js";
+
 const FIREBASE = "https://hacker-news.firebaseio.com/v0";
 
 export const categories = ["top", "new", "best", "ask", "show"];
@@ -6,6 +8,7 @@ export const categoryLabels = { top: "Top", new: "New", best: "Best", ask: "Ask"
 export class HNClient {
   constructor({ maxConcurrent = Number(process.env.HN_MAX_CONCURRENT || 64) } = {}) {
     this.maxConcurrent = Math.max(1, Math.min(256, maxConcurrent || 64));
+    this.persistentCache = new SQLiteCache();
     this.cache = new Map();
     this.inflight = new Map();
     this.commentCache = new Map();
@@ -21,13 +24,23 @@ export class HNClient {
   async item(id, { fresh = false } = {}) {
     if (!fresh && this.cache.has(id)) return this.cache.get(id);
     if (!fresh && this.inflight.has(id)) return this.inflight.get(id);
+    if (!fresh) {
+      const cached = await this.persistentCache.getItem(id);
+      if (cached) {
+        this.cache.set(id, cached);
+        return cached;
+      }
+    }
     const promise = fetch(`${FIREBASE}/item/${id}.json`)
       .then((response) => {
         if (!response.ok) throw new Error(`fetch item ${id}: ${response.status} ${response.statusText}`);
         return response.json();
       })
       .then((item) => {
-        if (item) this.cache.set(id, item);
+        if (item) {
+          this.cache.set(id, item);
+          this.persistentCache.putItem(item);
+        }
         return item;
       })
       .finally(() => this.inflight.delete(id));
@@ -36,11 +49,23 @@ export class HNClient {
   }
 
   async items(ids, options) {
+    const fresh = options?.fresh || false;
     const out = new Array(ids.length);
+    if (!fresh) {
+      const cached = await this.persistentCache.getItems(ids);
+      ids.forEach((id, index) => {
+        const item = this.cache.get(id) || cached.get(Number(id));
+        if (item) {
+          this.cache.set(id, item);
+          out[index] = item;
+        }
+      });
+    }
     let next = 0;
     const workers = Array.from({ length: Math.min(this.maxConcurrent, ids.length) }, async () => {
       while (next < ids.length) {
         const index = next++;
+        if (out[index]) continue;
         out[index] = await this.item(ids[index], options);
       }
     });

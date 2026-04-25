@@ -8,6 +8,8 @@ export class HNClient {
     this.maxConcurrent = Math.max(1, Math.min(256, maxConcurrent || 64));
     this.cache = new Map();
     this.inflight = new Map();
+    this.commentCache = new Map();
+    this.commentInflight = new Map();
   }
 
   async storyIds(category) {
@@ -46,23 +48,34 @@ export class HNClient {
     return out.filter(Boolean);
   }
 
-  async comments(item, depth = 0, limit = 250) {
+  async comments(item, depth = 0, limit = 250, { fresh = false } = {}) {
     const ids = item?.kids || [];
-    let remaining = limit;
-    const walk = async (commentIds, currentDepth) => {
-      if (!commentIds.length || remaining <= 0) return [];
-      const loaded = await this.items(commentIds.slice(0, remaining));
-      const comments = [];
-      for (const child of loaded) {
-        if (!child || child.deleted || child.dead) continue;
-        remaining -= 1;
-        const node = { item: child, depth: currentDepth, children: [] };
-        if (remaining > 0 && child.kids?.length) node.children = await walk(child.kids, currentDepth + 1);
-        comments.push(node);
-      }
+    const key = `${item?.id || "none"}:${depth}:${limit}`;
+    if (!fresh && this.commentCache.has(key)) return this.commentCache.get(key);
+    if (!fresh && this.commentInflight.has(key)) return this.commentInflight.get(key);
+
+    const promise = (async () => {
+      let remaining = limit;
+      const walk = async (commentIds, currentDepth) => {
+        if (!commentIds.length || remaining <= 0) return [];
+        const loaded = await this.items(commentIds.slice(0, remaining), { fresh });
+        const comments = [];
+        for (const child of loaded) {
+          if (!child || child.deleted || child.dead) continue;
+          remaining -= 1;
+          const node = { item: child, depth: currentDepth, children: [] };
+          if (remaining > 0 && child.kids?.length) node.children = await walk(child.kids, currentDepth + 1);
+          comments.push(node);
+        }
+        return comments;
+      };
+      const comments = await walk(ids, depth);
+      this.commentCache.set(key, comments);
       return comments;
-    };
-    return walk(ids, depth);
+    })().finally(() => this.commentInflight.delete(key));
+
+    this.commentInflight.set(key, promise);
+    return promise;
   }
 }
 

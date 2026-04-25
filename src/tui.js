@@ -7,6 +7,7 @@ import { Translator } from "./translate.js";
 
 const INITIAL_LOAD = 20;
 const PAGE_SIZE = 20;
+const PREFETCH_COMMENTS = 4;
 
 export class App {
   constructor(category, themeName) {
@@ -29,6 +30,7 @@ export class App {
     this.collapsed = new Set();
     this.translations = new Map();
     this.commentTranslations = new Map();
+    this.prefetchingComments = new Set();
   }
 
   async run() {
@@ -55,6 +57,7 @@ export class App {
     const items = await this.client.items(this.ids[category].slice(0, take), { fresh });
     this.stories[category] = items.map((item, index) => ({ ...item, rank: index + 1, domain: storyDomain(item.url) }));
     this.status = `${this.stories[category].length}/${this.ids[category].length} stories`;
+    this.prefetchCommentThreads();
   }
 
   async loadMoreStories() {
@@ -67,6 +70,7 @@ export class App {
     const items = await this.client.items(ids.slice(start, start + PAGE_SIZE));
     this.stories[this.category] = stories.concat(items.map((item, index) => ({ ...item, rank: start + index + 1, domain: storyDomain(item.url) })));
     this.status = `${this.stories[this.category].length}/${ids.length} stories`;
+    this.prefetchCommentThreads();
     this.render();
   }
 
@@ -77,6 +81,7 @@ export class App {
     this.offset = 0;
     this.mode = "list";
     if (!this.stories[this.category]) await this.loadStories(this.category);
+    this.prefetchCommentThreads();
     this.render();
   }
 
@@ -95,6 +100,11 @@ export class App {
     this.commentCursor = 0;
     this.commentOffset = 0;
     this.render();
+    if (!story.kids?.length) {
+      this.status = "No comments yet";
+      this.render();
+      return;
+    }
     this.comments = await this.client.comments(story, 0);
     this.rebuildFlatComments();
     this.status = `${story.descendants || this.flatComments.length || 0} comments`;
@@ -121,7 +131,7 @@ export class App {
       this.client.cache.delete(this.detail.id);
       const fresh = await this.client.item(this.detail.id, { fresh: true });
       this.detail = fresh;
-      this.comments = await this.client.comments(fresh, 0);
+      this.comments = await this.client.comments(fresh, 0, 250, { fresh: true });
       this.rebuildFlatComments();
       this.status = "Comments refreshed";
     }
@@ -198,19 +208,20 @@ export class App {
     else if (seq === "t") return this.translateCurrent(false);
     else if (seq === "T") return this.translateCurrent(true);
     if (this.selected >= stories.length - 5) await this.loadMoreStories();
+    this.prefetchCommentThreads();
     this.render();
   }
 
   async onDetailKey(name, seq) {
     if (name === "escape") {
       this.mode = "list";
+      this.prefetchCommentThreads();
       return this.render();
     }
     if (name === "down" || seq === "j") this.commentCursor = Math.min(this.flatComments.length - 1, this.commentCursor + 1);
     else if (name === "up" || seq === "k") this.commentCursor = Math.max(0, this.commentCursor - 1);
     else if (seq === "g") this.commentCursor = 0;
-    else if (seq === "r") this.commentCursor = 0;
-    else if (seq === "R") return this.refresh();
+    else if (seq === "r" || seq === "R") return this.refresh();
     else if (seq === "o") openUrl(this.detail?.url || `https://news.ycombinator.com/item?id=${this.detail?.id}`);
     else if (seq === "t") return this.translateCurrent(false);
     else if (seq === "C") {
@@ -234,14 +245,28 @@ export class App {
     return { width: process.stdout.columns || 100, height: process.stdout.rows || 30 };
   }
 
-  visibleStories() {
+  visibleStoryCount() {
     const { height } = this.terminalSize();
-    return (this.stories[this.category] || []).slice(this.offset, this.offset + Math.max(1, height - 6));
+    return Math.max(1, Math.floor((height - 3) / 2));
+  }
+
+  visibleStories() {
+    return (this.stories[this.category] || []).slice(this.offset, this.offset + this.visibleStoryCount());
+  }
+
+  prefetchCommentThreads() {
+    if (this.mode !== "list") return;
+    const stories = this.stories[this.category] || [];
+    const candidates = stories.slice(this.selected, this.selected + PREFETCH_COMMENTS).filter((story) => story?.kids?.length);
+    for (const story of candidates) {
+      if (this.prefetchingComments.has(story.id)) continue;
+      this.prefetchingComments.add(story.id);
+      this.client.comments(story, 0).catch(() => {}).finally(() => this.prefetchingComments.delete(story.id));
+    }
   }
 
   ensureListWindow() {
-    const { height } = this.terminalSize();
-    const rows = Math.max(1, height - 6);
+    const rows = this.visibleStoryCount();
     if (this.selected < this.offset) this.offset = this.selected;
     if (this.selected >= this.offset + rows) this.offset = this.selected - rows + 1;
   }
@@ -269,7 +294,7 @@ export class App {
   renderList() {
     this.ensureListWindow();
     const { width, height } = this.terminalSize();
-    const rows = Math.max(1, height - 5);
+    const rows = this.visibleStoryCount();
     const stories = this.stories[this.category] || [];
     const out = [this.renderHeader(width), this.theme.muted("Enter comments  o open  t/T translate  ←/→ tabs  r refresh  ? help  q quit")];
     for (let i = this.offset; i < Math.min(stories.length, this.offset + rows); i++) {
@@ -298,6 +323,9 @@ export class App {
     const lines = [];
     if (this.detail?.text) {
       for (const line of wrap(this.detail.text, width - 2)) lines.push({ text: `  ${this.theme.muted(line)}` });
+    }
+    if (!this.flatComments.length) {
+      lines.push({ text: this.theme.muted("  No comments yet. Press Esc to go back or o to open the story.") });
     }
     for (let i = 0; i < this.flatComments.length; i++) {
       const node = this.flatComments[i];

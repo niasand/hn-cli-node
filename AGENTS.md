@@ -61,6 +61,8 @@ The history uses short commit messages, but there is no formal convention. Prefe
 
 Pull requests should include a short description, user-visible behavior changes, and verification steps such as `npm run check` plus manual terminal testing. Link related issues when available. Screenshots are useful for visual TUI changes.
 
+After completing code changes, run the relevant checks and commit the changes automatically unless the user explicitly says not to commit. Do not commit `.env`, API keys, credentials, secrets, local cache/database files, or unrelated user changes.
+
 ## Security & Configuration Tips
 
 Do not commit `.env` files or API keys. Translation settings come from environment variables or `~/.config/hn/config.json`; environment variables take precedence. Document new configuration keys in `README.md`.

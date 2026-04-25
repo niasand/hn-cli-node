@@ -47,6 +47,7 @@ The CLI reads `~/.config/hn/config.json` and a local `.env` file. Environment
 variables take precedence.
 
 ```bash
+HN_TRANSLATE_PROVIDER=openai
 HN_TRANSLATE_API_URL=https://api.openai.com/v1
 HN_TRANSLATE_API_KEY=sk-...
 HN_TRANSLATE_MODEL=gpt-4o-mini
@@ -54,5 +55,16 @@ HN_TRANSLATE_LANG=Chinese
 HN_THEME=hn
 HN_MAX_CONCURRENT=64
 ```
+
+For DeepL API Pro, use:
+
+```bash
+HN_TRANSLATE_PROVIDER=deepl
+HN_TRANSLATE_API_URL=https://api.deepl.com/v2
+HN_TRANSLATE_API_KEY=your-deepl-api-key
+HN_TRANSLATE_LANG=ZH
+```
+
+For DeepL API Free, use `https://api-free.deepl.com/v2`.
 
 Available themes: `hn`, `mocha`, `dracula`, `tokyo`, `nord`, `gruvbox`.

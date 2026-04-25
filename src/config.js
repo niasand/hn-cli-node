@@ -37,8 +37,11 @@ export function saveConfig(config) {
 export function loadTranslateConfig() {
   const config = loadConfig();
   const translate = { ...(config.translate || {}) };
+  const provider = process.env.HN_TRANSLATE_PROVIDER || translate.provider || "openai";
+  const defaultApiUrl = provider.toLowerCase() === "deepl" ? "https://api.deepl.com/v2" : "https://api.openai.com/v1";
   return {
-    apiUrl: process.env.HN_TRANSLATE_API_URL || translate.api_url || "https://api.openai.com/v1",
+    provider,
+    apiUrl: process.env.HN_TRANSLATE_API_URL || translate.api_url || defaultApiUrl,
     apiKey: process.env.HN_TRANSLATE_API_KEY || translate.api_key || "",
     model: process.env.HN_TRANSLATE_MODEL || translate.model || "gpt-4o-mini",
     language: process.env.HN_TRANSLATE_LANG || translate.language || "Chinese",

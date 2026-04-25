@@ -1,0 +1,17 @@
+{
+  "name": "hn-cli-node",
+  "version": "0.1.0",
+  "description": "A Node.js terminal client for Hacker News.",
+  "type": "module",
+  "bin": {
+    "hn": "./bin/hn.js"
+  },
+  "scripts": {
+    "start": "node ./bin/hn.js",
+    "check": "node --check ./bin/hn.js && node --check ./src/*.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

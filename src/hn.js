@@ -1,0 +1,86 @@
+const FIREBASE = "https://hacker-news.firebaseio.com/v0";
+
+export const categories = ["top", "new", "best", "ask", "show"];
+export const categoryLabels = { top: "Top", new: "New", best: "Best", ask: "Ask", show: "Show" };
+
+export class HNClient {
+  constructor({ maxConcurrent = Number(process.env.HN_MAX_CONCURRENT || 64) } = {}) {
+    this.maxConcurrent = Math.max(1, Math.min(256, maxConcurrent || 64));
+    this.cache = new Map();
+    this.inflight = new Map();
+  }
+
+  async storyIds(category) {
+    const response = await fetch(`${FIREBASE}/${category}stories.json`);
+    if (!response.ok) throw new Error(`fetch ${category} stories: ${response.status} ${response.statusText}`);
+    return response.json();
+  }
+
+  async item(id, { fresh = false } = {}) {
+    if (!fresh && this.cache.has(id)) return this.cache.get(id);
+    if (!fresh && this.inflight.has(id)) return this.inflight.get(id);
+    const promise = fetch(`${FIREBASE}/item/${id}.json`)
+      .then((response) => {
+        if (!response.ok) throw new Error(`fetch item ${id}: ${response.status} ${response.statusText}`);
+        return response.json();
+      })
+      .then((item) => {
+        if (item) this.cache.set(id, item);
+        return item;
+      })
+      .finally(() => this.inflight.delete(id));
+    this.inflight.set(id, promise);
+    return promise;
+  }
+
+  async items(ids, options) {
+    const out = new Array(ids.length);
+    let next = 0;
+    const workers = Array.from({ length: Math.min(this.maxConcurrent, ids.length) }, async () => {
+      while (next < ids.length) {
+        const index = next++;
+        out[index] = await this.item(ids[index], options);
+      }
+    });
+    await Promise.all(workers);
+    return out.filter(Boolean);
+  }
+
+  async comments(item, depth = 0, limit = 250) {
+    const ids = item?.kids || [];
+    let remaining = limit;
+    const walk = async (commentIds, currentDepth) => {
+      if (!commentIds.length || remaining <= 0) return [];
+      const loaded = await this.items(commentIds.slice(0, remaining));
+      const comments = [];
+      for (const child of loaded) {
+        if (!child || child.deleted || child.dead) continue;
+        remaining -= 1;
+        const node = { item: child, depth: currentDepth, children: [] };
+        if (remaining > 0 && child.kids?.length) node.children = await walk(child.kids, currentDepth + 1);
+        comments.push(node);
+      }
+      return comments;
+    };
+    return walk(ids, depth);
+  }
+}
+
+export function storyDomain(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    return host;
+  } catch {
+    return "";
+  }
+}
+
+export function relativeTime(unixSeconds) {
+  const seconds = Math.max(0, Math.floor(Date.now() / 1000 - unixSeconds));
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
+  if (seconds < 2592000) return `${Math.round(seconds / 86400)}d`;
+  if (seconds < 31536000) return `${Math.round(seconds / 2592000)}mo`;
+  return `${Math.round(seconds / 31536000)}y`;
+}

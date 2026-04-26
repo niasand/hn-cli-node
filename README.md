@@ -1,6 +1,5 @@
 # hn-cli-node
 
-A Node.js rewrite of [`heartleo/hn-cli`](https://github.com/heartleo/hn-cli).
 
 This version keeps the same core workflow: browse Hacker News categories, open
 comment threads, fold comments, open stories in a browser, set themes, and use

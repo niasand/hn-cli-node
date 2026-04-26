@@ -265,7 +265,7 @@ export class App {
   }
 
   storyLink(story) {
-    return hyperlink(this.storyUrl(story), "link");
+    return hyperlink(`https://news.ycombinator.com/item?id=${story.id}`, "link");
   }
 
   prefetchCommentThreads() {
